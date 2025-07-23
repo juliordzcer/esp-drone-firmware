@@ -1,8 +1,8 @@
 /**
  *
  * ESP-Drone Firmware
- * 
- * Copyright 2019-2020  Espressif Systems (Shanghai) 
+ *
+ * Copyright 2019-2020  Espressif Systems (Shanghai)
  * Copyright (C) 2011-2012 Bitcraze AB
  *
  * This program is free software: you can redistribute it and/or modify
@@ -22,11 +22,11 @@
  * This file define the default configuration of the copter
  * It contains two types of parameters:
  * - The global parameters are globally defined and independent of any
- *   compilation profile. An example of such define could be some pinout.
+ * compilation profile. An example of such define could be some pinout.
  * - The profiled defines, they are parameter that can be specific to each
- *   dev build. The vanilla build is intended to be a "customer" build without
- *   fancy spinning debugging stuff. The developers build are anything the
- *   developer could need to debug and run his code/crazy stuff.
+ * dev build. The vanilla build is intended to be a "customer" build without
+ * fancy spinning debugging stuff. The developers build are anything the
+ * developer could need to debug and run his code/crazy stuff.
  *
  * The golden rule for the profile is NEVER BREAK ANOTHER PROFILE. When adding a
  * new parameter, one shall take care to modified everything necessary to
@@ -37,57 +37,37 @@
 
 #ifndef CONFIG_H_
 #define CONFIG_H_
-//#include "nrf24l01.h"
 
-//#include "trace.h"
 #include "usec_time.h"
 #include "sdkconfig.h"
 
 #define PROTOCOL_VERSION 4
-#define QUAD_FORMATION_X
+#define QUAD_FORMATION_X // Define para la formación del cuadricóptero (ej. forma de 'X')
 
+// Comprobaciones de la configuración del objetivo de hardware
 #ifdef CONFIG_TARGET_ESPLANE_V2_S2
 #ifndef CONFIG_IDF_TARGET_ESP32S2
-#error "ESPLANE_V2 hardware with ESP32S2 onboard"
+#error "ESPLANE_V2 hardware with ESP32S2 onboard" // Error si el hardware es ESP-Plane V2 pero el objetivo no es ESP32S2
 #endif
 #elif defined(CONFIG_TARGET_ESPLANE_V1)
 #ifndef CONFIG_IDF_TARGET_ESP32
-#error "ESPLANE_V1 hardware with ESP32 onboard"
+#error "ESPLANE_V1 hardware with ESP32 onboard" // Error si el hardware es ESP-Plane V1 pero el objetivo no es ESP32
 #endif
 #elif defined(CONFIG_TARGET_ESP32_S2_DRONE_V1_2)
 #ifdef CONFIG_IDF_TARGET_ESP32
-#error "ESP32_S2_DRONE_V1_2 hardware with ESP32S2/S3 onboard"
+#error "ESP32_S2_DRONE_V1_2 hardware with ESP32S2/S3 onboard" // Error si el hardware es ESP32-S2 Drone V1.2 pero el objetivo es ESP32 (debería ser S2/S3)
 #endif
 #endif
 
-#ifdef STM32F4XX 
-  #define CONFIG_BLOCK_ADDRESS    (2048 * (64-1))
-  #define MCU_ID_ADDRESS          0x1FFF7A10
-  #define MCU_FLASH_SIZE_ADDRESS  0x1FFF7A22
-  #ifndef FREERTOS_HEAP_SIZE
-    #define FREERTOS_HEAP_SIZE      20000
-  #endif
-  #define FREERTOS_MIN_STACK_SIZE 150       // M4-FPU register setup is bigger so stack needs to be bigger
-  #define FREERTOS_MCU_CLOCK_HZ   168000000
-
-  #define configGENERATE_RUN_TIME_STATS 1
-  #define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS() initUsecTimer()
-  #define portGET_RUN_TIME_COUNTER_VALUE() usecTimestamp()
-#endif
-
-
-//#define DEBUG_UDP
-//#define DEBUG_EP2
-
-// Task priorities. Higher number higher priority
-// system state tasks
+// Prioridades de las tareas. Un número más alto indica mayor prioridad.
+// Tareas de estado del sistema
 #define SYSTEM_TASK_PRI         1
 #define PM_TASK_PRI             1
 #define LEDSEQCMD_TASK_PRI      1
-// communication TX tasks
+// Tareas de comunicación TX
 #define UDP_TX_TASK_PRI         2
 #define CRTP_TX_TASK_PRI        2
-// communication RX tasks
+// Tareas de comunicación RX
 #define UDP_RX_TASK_PRI         2
 #define EXTRX_TASK_PRI          2
 #define UART2_TASK_PRI          2
@@ -100,35 +80,34 @@
 #define LOG_TASK_PRI            2
 #define MEM_TASK_PRI            2
 #define PARAM_TASK_PRI          2
-// sensors and stabilize related tasks
-#define PROXIMITY_TASK_PRI      5
-#define FLOW_TASK_PRI           5
-#define ZRANGER2_TASK_PRI       5
-#define ZRANGER_TASK_PRI        5
+// Tareas relacionadas con sensores y estabilización
+// #define PROXIMITY_TASK_PRI      5
+// #define FLOW_TASK_PRI           5
+// #define ZRANGER2_TASK_PRI       5
+// #define ZRANGER_TASK_PRI        5
 #define SENSORS_TASK_PRI        6
 #define STABILIZER_TASK_PRI     7
 #define KALMAN_TASK_PRI         4
 
-// the kalman filter consumes a lot of CPU
-// for single core systems, we need to lower the priority
+// El filtro Kalman consume mucha CPU. Para sistemas de un solo núcleo, se necesita bajar la prioridad.
 #if CONFIG_FREERTOS_UNICORE
   #undef KALMAN_TASK_PRI
   #define KALMAN_TASK_PRI         1
 #endif
 
-// Task names
+// Nombres de las tareas
 #define CMD_HIGH_LEVEL_TASK_NAME "CMDHL"
 #define CRTP_RX_TASK_NAME       "CRTP-RX"
 #define CRTP_TX_TASK_NAME       "CRTP-TX"
 #define EXTRX_TASK_NAME         "EXTRX"
-#define FLOW_TASK_NAME          "FLOW"
+// #define FLOW_TASK_NAME          "FLOW"
 #define KALMAN_TASK_NAME        "KALMAN"
 #define LEDSEQCMD_TASK_NAME     "LEDSEQCMD"
 #define LOG_TASK_NAME           "LOG"
 #define MEM_TASK_NAME           "MEM"
 #define PARAM_TASK_NAME         "PARAM"
 #define PM_TASK_NAME            "PWRMGNT"
-#define PROXIMITY_TASK_NAME     "PROXIMITY"
+// #define PROXIMITY_TASK_NAME     "PROXIMITY"
 #define SENSORS_TASK_NAME       "SENSORS"
 #define STABILIZER_TASK_NAME    "STABILIZER"
 #define SYSLINK_TASK_NAME       "SYSLINK"
@@ -138,16 +117,16 @@
 #define UDP_TX_TASK_NAME        "UDP_TX"
 #define USBLINK_TASK_NAME       "USBLINK"
 #define WIFILINK_TASK_NAME      "WIFILINK"
-#define ZRANGER2_TASK_NAME      "ZRANGER2"
-#define ZRANGER_TASK_NAME       "ZRANGER"
+// #define ZRANGER2_TASK_NAME      "ZRANGER2"
+// #define ZRANGER_TASK_NAME       "ZRANGER"
 
-//Task stack sizes
+// Tamaños de pila de las tareas
 #define configBASE_STACK_SIZE CONFIG_BASE_STACK_SIZE
 #define CMD_HIGH_LEVEL_TASK_STACKSIZE (2 * configBASE_STACK_SIZE)
 #define CRTP_RX_TASK_STACKSIZE        (3 * configBASE_STACK_SIZE)
 #define CRTP_TX_TASK_STACKSIZE        (3 * configBASE_STACK_SIZE)
 #define EXTRX_TASK_STACKSIZE          (1 * configBASE_STACK_SIZE)
-#define FLOW_TASK_STACKSIZE           (3 * configBASE_STACK_SIZE)
+// #define FLOW_TASK_STACKSIZE           (3 * configBASE_STACK_SIZE)
 #define KALMAN_TASK_STACKSIZE         (3 * configBASE_STACK_SIZE)
 #define LEDSEQCMD_TASK_STACKSIZE      (2 * configBASE_STACK_SIZE)
 #define LOG_TASK_STACKSIZE            (3 * configBASE_STACK_SIZE)
@@ -163,70 +142,24 @@
 #define UDP_TX_TASK_STACKSIZE         (4 * configBASE_STACK_SIZE)
 #define USBLINK_TASK_STACKSIZE        (1 * configBASE_STACK_SIZE)
 #define WIFILINK_TASK_STACKSIZE       (4 * configBASE_STACK_SIZE)
-#define ZRANGER2_TASK_STACKSIZE       (4 * configBASE_STACK_SIZE)
-#define ZRANGER_TASK_STACKSIZE        (2 * configBASE_STACK_SIZE)
+// #define ZRANGER2_TASK_STACKSIZE       (4 * configBASE_STACK_SIZE)
+// #define ZRANGER_TASK_STACKSIZE        (2 * configBASE_STACK_SIZE)
 
-//The radio channel. From 0 to 125
+// Parámetros de radio
+// La tasa de radio. 2Mbit/s.
 #define RADIO_RATE_2M 2
+// El canal de radio. De 0 a 125.
 #define RADIO_CHANNEL 80
+// La tasa de datos de radio.
 #define RADIO_DATARATE RADIO_RATE_2M
+// La dirección de radio (64 bits).
 #define RADIO_ADDRESS 0xE7E7E7E7E7ULL
 
 /**
  * \def PROPELLER_BALANCE_TEST_THRESHOLD
- * This is the threshold for a propeller/motor to pass. It calculates the variance of the accelerometer X+Y
- * when the propeller is spinning.
+ * Este es el umbral para que una hélice/motor pase la prueba. Calcula la varianza del acelerómetro X+Y
+ * cuando la hélice está girando.
  */
 #define PROPELLER_BALANCE_TEST_THRESHOLD  2.5f
-
-/**
- * \def ACTIVATE_AUTO_SHUTDOWN
- * Will automatically shot of system if no radio activity
- */
-//#define ACTIVATE_AUTO_SHUTDOWN
-
-/**
- * \def ACTIVATE_STARTUP_SOUND
- * Playes a startup melody using the motors and PWM modulation
- */
-//#define ACTIVATE_STARTUP_SOUND
-
-// Define to force initialization of expansion board drivers. For test-rig and programming.
-//#define FORCE_EXP_DETECT
-
-/**
- * \def PRINT_OS_DEBUG_INFO
- * Print with an interval information about freertos mem/stack usage to console.
- */
-//#define PRINT_OS_DEBUG_INFO
-
-
-//Debug defines
-//#define BRUSHLESS_MOTORCONTROLLER
-//#define ADC_OUTPUT_RAW_DATA
-//#define UART_OUTPUT_TRACE_DATA
-//#define UART_OUTPUT_RAW_DATA_ONLY
-//#define IMU_OUTPUT_RAW_DATA_ON_UART
-//#define T_LAUCH_MOTORS
-//#define T_LAUCH_MOTOR_TEST
-//#define MOTOR_RAMPUP_TEST
-/**
- * \def ADC_OUTPUT_RAW_DATA
- * When defined the gyro data will be written to the UART channel.
- * The UART must be configured to run really fast, e.g. in 2Mb/s.
- */
-//#define ADC_OUTPUT_RAW_DATA
-
-#if defined(UART_OUTPUT_TRACE_DATA) && defined(ADC_OUTPUT_RAW_DATA)
-#  error "Can't define UART_OUTPUT_TRACE_DATA and ADC_OUTPUT_RAW_DATA at the same time"
-#endif
-
-#if defined(UART_OUTPUT_TRACE_DATA) || defined(ADC_OUTPUT_RAW_DATA) || defined(IMU_OUTPUT_RAW_DATA_ON_UART)
-#define UART_OUTPUT_RAW_DATA_ONLY
-#endif
-
-#if defined(UART_OUTPUT_TRACE_DATA) && defined(T_LAUNCH_ACC)
-#  error "UART_OUTPUT_TRACE_DATA and T_LAUNCH_ACC doesn't work at the same time yet due to dma sharing..."
-#endif
 
 #endif /* CONFIG_H_ */
