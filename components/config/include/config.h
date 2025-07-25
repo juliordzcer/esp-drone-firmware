@@ -4,6 +4,7 @@
  * 
  * Copyright 2019-2020  Espressif Systems (Shanghai) 
  * Copyright (C) 2011-2012 Bitcraze AB
+ * Copyright (C) 2025-2026 Julio Cesar Rodriguez
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -100,11 +101,6 @@
 #define LOG_TASK_PRI            2
 #define MEM_TASK_PRI            2
 #define PARAM_TASK_PRI          2
-// sensors and stabilize related tasks
-// #define PROXIMITY_TASK_PRI      5
-// #define FLOW_TASK_PRI           5
-// #define ZRANGER2_TASK_PRI       5
-// #define ZRANGER_TASK_PRI        5
 #define SENSORS_TASK_PRI        6
 #define STABILIZER_TASK_PRI     7
 #define KALMAN_TASK_PRI         4
@@ -138,9 +134,6 @@
 #define UDP_TX_TASK_NAME        "UDP_TX"
 #define USBLINK_TASK_NAME       "USBLINK"
 #define WIFILINK_TASK_NAME      "WIFILINK"
-// #define ZRANGER2_TASK_NAME      "ZRANGER2"
-// #define ZRANGER_TASK_NAME       "ZRANGER"
-
 //Task stack sizes
 #define configBASE_STACK_SIZE CONFIG_BASE_STACK_SIZE
 #define CMD_HIGH_LEVEL_TASK_STACKSIZE (2 * configBASE_STACK_SIZE)
@@ -163,8 +156,6 @@
 #define UDP_TX_TASK_STACKSIZE         (4 * configBASE_STACK_SIZE)
 #define USBLINK_TASK_STACKSIZE        (1 * configBASE_STACK_SIZE)
 #define WIFILINK_TASK_STACKSIZE       (4 * configBASE_STACK_SIZE)
-// #define ZRANGER2_TASK_STACKSIZE       (4 * configBASE_STACK_SIZE)
-// #define ZRANGER_TASK_STACKSIZE        (2 * configBASE_STACK_SIZE)
 
 //The radio channel. From 0 to 125
 #define RADIO_RATE_2M 2
