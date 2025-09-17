@@ -91,6 +91,9 @@
 #define UDP_RX_TASK_PRI         2
 #define EXTRX_TASK_PRI          2
 #define UART2_TASK_PRI          2
+#define CRTP_SRV_TASK_PRI       0
+#define PLATFORM_SRV_TASK_PRI   0
+
 #define SYSLINK_TASK_PRI        2
 #define USBLINK_TASK_PRI        2
 #define WIFILINK_TASK_PRI       2
@@ -134,6 +137,8 @@
 #define SYSLINK_TASK_NAME       "SYSLINK"
 #define SYSTEM_TASK_NAME        "SYSTEM"
 #define UART2_TASK_NAME         "UART2"
+#define CRTP_SRV_TASK_NAME      "CRTP-SRV"
+#define PLATFORM_SRV_TASK_NAME  "PLATFORM-SRV"
 #define UDP_RX_TASK_NAME        "UDP_RX"
 #define UDP_TX_TASK_NAME        "UDP_TX"
 #define USBLINK_TASK_NAME       "USBLINK"
@@ -165,6 +170,9 @@
 #define WIFILINK_TASK_STACKSIZE       (4 * configBASE_STACK_SIZE)
 #define ZRANGER2_TASK_STACKSIZE       (4 * configBASE_STACK_SIZE)
 #define ZRANGER_TASK_STACKSIZE        (2 * configBASE_STACK_SIZE)
+
+#define CRTP_SRV_TASK_STACKSIZE       (1 * configBASE_STACK_SIZE)
+#define PLATFORM_SRV_TASK_STACKSIZE   (1 * configBASE_STACK_SIZE)
 
 //The radio channel. From 0 to 125
 #define RADIO_RATE_2M 2
