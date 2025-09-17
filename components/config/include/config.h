@@ -179,6 +179,9 @@
  */
 #define PROPELLER_BALANCE_TEST_THRESHOLD  2.5f
 
+
+#define BAT_LOADING_SAG_THRESHOLD  0.95f
+
 /**
  * \def ACTIVATE_AUTO_SHUTDOWN
  * Will automatically shot of system if no radio activity

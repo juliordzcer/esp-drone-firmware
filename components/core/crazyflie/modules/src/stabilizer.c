@@ -23,6 +23,7 @@
  *
  *
  */
+#define DEBUG_MODULE "STAB"
 
 #include <math.h>
 #include <inttypes.h>
@@ -31,38 +32,34 @@
 #include "task.h"
 
 #include "stm32_legacy.h"
+// #include "pm_esplane.h"
+#include "esp_timer.h"
+
 #include "system.h"
 #include "log.h"
 #include "param.h"
-#include "motors.h"
-#include "pm_esplane.h"
-#include "esp_timer.h"
+#include "debug_cf.h"
+
 #include "stabilizer.h"
+
 #include "sensors.h"
 #include "commander.h"
 #include "crtp_localization_service.h"
 #include "sitaw.h"
 #include "controller.h"
 #include "power_distribution.h"
-//#include "collision_avoidance.h"
+#include "health.h"
 
 #include "estimator.h"
 //#include "usddeck.h" //usddeckLoggingMode_e
 #include "quatcompress.h"
 #include "statsCnt.h"
-#define DEBUG_MODULE "STAB"
-#include "debug_cf.h"
 #include "static_mem.h"
-#include "rateSupervisor.h"
+
 
 static bool isInit;
 static bool emergencyStop = false;
 static int emergencyStopTimeout = EMERGENCY_STOP_TIMEOUT_DISABLED;
-
-static bool checkStops;
-
-#define PROPTEST_NBR_OF_VARIANCE_VALUES   100
-static bool startPropTest = false;
 
 uint32_t inToOutLatency;
 
@@ -75,16 +72,7 @@ static control_t control;
 static StateEstimatorType estimatorType;
 static ControllerType controllerType;
 
-typedef enum { configureAcc, measureNoiseFloor, measureProp, testBattery, restartBatTest, evaluateResult, testDone } TestState;
-#ifdef RUN_PROP_TEST_AT_STARTUP
-  static TestState testState = configureAcc;
-#else
-  static TestState testState = testDone;
-#endif
-
 static STATS_CNT_RATE_DEFINE(stabilizerRate, 500);
-static rateSupervisor_t rateSupervisorContext;
-static bool rateWarningDisplayed = false;
 
 static struct {
   // position - mm
@@ -122,21 +110,9 @@ static struct {
   int16_t az;
 } setpointCompressed;
 
-static float accVarX[NBR_OF_MOTORS];
-static float accVarY[NBR_OF_MOTORS];
-static float accVarZ[NBR_OF_MOTORS];
-// Bit field indicating if the motors passed the motor test.
-// Bit 0 - 1 = M1 passed
-// Bit 1 - 1 = M2 passed
-// Bit 2 - 1 = M3 passed
-// Bit 3 - 1 = M4 passed
-static uint8_t motorPass = 0;
-static uint16_t motorTestCount = 0;
-
 STATIC_MEM_TASK_ALLOC(stabilizerTask, STABILIZER_TASK_STACKSIZE);
 
 static void stabilizerTask(void* param);
-static void testProps(sensorData_t *sensors);
 
 static void calcSensorToOutputLatency(const sensorData_t *sensorData)
 {
@@ -192,14 +168,10 @@ void stabilizerInit(StateEstimatorType estimator)
     return;
 
   sensorsInit();
-  if (estimator == anyEstimator) {
-    estimator = deckGetRequiredEstimator();
-  }
   stateEstimatorInit(estimator);
   controllerInit(ControllerTypeAny);
   powerDistributionInit();
   sitAwInit();
-  //collisionAvoidanceInit();
   estimatorType = getStateEstimator();
   controllerType = getControllerType();
 
@@ -216,7 +188,6 @@ bool stabilizerTest(void)
   pass &= stateEstimatorTest();
   pass &= controllerTest();
   pass &= powerDistributionTest();
-  //pass &= collisionAvoidanceTest();
 
   return pass;
 }
@@ -242,42 +213,32 @@ static void stabilizerTask(void* param)
   uint32_t tick;
   uint32_t lastWakeTime;
 
-#ifdef configUSE_APPLICATION_TASK_TAG
-	#if configUSE_APPLICATION_TASK_TAG == 1
-  vTaskSetApplicationTaskTag(0, (void*)TASK_STABILIZER_ID_NBR);
-  #endif
-#endif
+  // TODO: Buscar una manera mejor de identificar la tarea
+  // vTaskSetApplicationTaskTag(0, (void*)TASK_STABILIZER_ID_NBR);
 
   //Wait for the system to be fully started to start stabilization loop
   systemWaitStart();
 
-  DEBUG_PRINTI("Wait for sensor calibration...\n");
+  DEBUG_PRINT("Wait for sensor calibration...\n");
 
   // Wait for sensors to be calibrated
-  lastWakeTime = xTaskGetTickCount();
+  lastWakeTime = xTaskGetTickCount ();
   while(!sensorsAreCalibrated()) {
     vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
   }
   // Initialize tick to something else then 0
   tick = 1;
 
-  rateSupervisorInit(&rateSupervisorContext, xTaskGetTickCount(), M2T(1000), 997, 1003, 1);
-
-  DEBUG_PRINTI("Ready to fly.\n");
+  DEBUG_PRINT("Ready to fly.\n");
 
   while(1) {
     // The sensor should unlock at 1kHz
     sensorsWaitDataReady();
 
-    if (startPropTest != false) {
-      // TODO: What happens with estimator when we run tests after startup?
-      testState = configureAcc;
-      startPropTest = false;
-    }
-
-    if (testState != testDone) {
+    if (healthShallWeRunTest())
+    {
       sensorsAcquire(&sensorData, tick);
-      testProps(&sensorData);
+      healthRunTests(&sensorData);
     } else {
       // allow to update estimator dynamically
       if (getStateEstimator() != estimatorType) {
@@ -297,36 +258,27 @@ static void stabilizerTask(void* param)
       compressSetpoint();
 
       sitAwUpdateSetpoint(&setpoint, &sensorData, &state);
-      //collisionAvoidanceUpdateSetpoint(&setpoint, &sensorData, &state, tick);
 
       controller(&control, &setpoint, &sensorData, &state, tick);
 
       checkEmergencyStopTimeout();
 
-      checkStops = systemIsArmed();
-      if (emergencyStop || (systemIsArmed() == false)) {
+      if (emergencyStop) {
         powerStop();
       } else {
         powerDistribution(&control);
       }
 
-      //TODO: Log data to uSD card if configured
-      /*if (usddeckLoggingEnabled()
-          && usddeckLoggingMode() == usddeckLoggingMode_SynchronousStabilizer
-          && RATE_DO_EXECUTE(usddeckFrequency(), tick)) {
-        usddeckTriggerLogging();
-      }*/
+      // Log data to uSD card if configured
+      // if (   usddeckLoggingEnabled()
+      //     && usddeckLoggingMode() == usddeckLoggingMode_SynchronousStabilizer
+      //     && RATE_DO_EXECUTE(usddeckFrequency(), tick)) {
+      //   usddeckTriggerLogging();
+      // }
     }
     calcSensorToOutputLatency(&sensorData);
     tick++;
     STATS_CNT_RATE_EVENT(&stabilizerRate);
-
-    if (!rateSupervisorValidate(&rateSupervisorContext, xTaskGetTickCount())) {
-      if (!rateWarningDisplayed) {
-        DEBUG_PRINT("WARNING: stabilizer loop rate is off (%"PRIu32")\n", rateSupervisorLatestCount(&rateSupervisorContext));
-        rateWarningDisplayed = true;
-      }
-    }
   }
 }
 
@@ -346,236 +298,11 @@ void stabilizerSetEmergencyStopTimeout(int timeout)
   emergencyStopTimeout = timeout;
 }
 
-static float variance(float *buffer, uint32_t length)
-{
-  uint32_t i;
-  float sum = 0;
-  float sumSq = 0;
-
-  for (i = 0; i < length; i++)
-  {
-    sum += buffer[i];
-    sumSq += buffer[i] * buffer[i];
-  }
-
-  return sumSq - (sum * sum) / length;
-}
-
-/** Evaluate the values from the propeller test
- * @param low The low limit of the self test
- * @param high The high limit of the self test
- * @param value The value to compare with.
- * @param string A pointer to a string describing the value.
- * @return True if self test within low - high limit, false otherwise
- */
-static bool evaluateTest(float low, float high, float value, uint8_t motor)
-{
-  if (value < low || value > high)
-  {
-    DEBUG_PRINTI("Propeller test on M%d [FAIL]. low: %0.2f, high: %0.2f, measured: %0.2f\n",
-                motor + 1, (double)low, (double)high, (double)value);
-    return false;
-  }
-
-  motorPass |= (1 << motor);
-
-  return true;
-}
-
-
-static void testProps(sensorData_t *sensors)
-{
-  static uint32_t i = 0;
-  NO_DMA_CCM_SAFE_ZERO_INIT static float accX[PROPTEST_NBR_OF_VARIANCE_VALUES];
-  NO_DMA_CCM_SAFE_ZERO_INIT static float accY[PROPTEST_NBR_OF_VARIANCE_VALUES];
-  NO_DMA_CCM_SAFE_ZERO_INIT static float accZ[PROPTEST_NBR_OF_VARIANCE_VALUES];
-  static float accVarXnf;
-  static float accVarYnf;
-  static float accVarZnf;
-  static int motorToTest = 0;
-  static uint8_t nrFailedTests = 0;
-  static float idleVoltage;
-  static float minSingleLoadedVoltage[NBR_OF_MOTORS];
-  static float minLoadedVoltage;
-
-  if (testState == configureAcc)
-  {
-    motorPass = 0;
-    sensorsSetAccMode(ACC_MODE_PROPTEST);
-    testState = measureNoiseFloor;
-    minLoadedVoltage = idleVoltage = pmGetBatteryVoltage();
-    minSingleLoadedVoltage[MOTOR_M1] = minLoadedVoltage;
-    minSingleLoadedVoltage[MOTOR_M2] = minLoadedVoltage;
-    minSingleLoadedVoltage[MOTOR_M3] = minLoadedVoltage;
-    minSingleLoadedVoltage[MOTOR_M4] = minLoadedVoltage;
-  }
-  if (testState == measureNoiseFloor)
-  {
-    accX[i] = sensors->acc.x;
-    accY[i] = sensors->acc.y;
-    accZ[i] = sensors->acc.z;
-
-    if (++i >= PROPTEST_NBR_OF_VARIANCE_VALUES)
-    {
-      i = 0;
-      accVarXnf = variance(accX, PROPTEST_NBR_OF_VARIANCE_VALUES);
-      accVarYnf = variance(accY, PROPTEST_NBR_OF_VARIANCE_VALUES);
-      accVarZnf = variance(accZ, PROPTEST_NBR_OF_VARIANCE_VALUES);
-      DEBUG_PRINTI("Acc noise floor variance X+Y:%f, (Z:%f)\n",
-                  (double)accVarXnf + (double)accVarYnf, (double)accVarZnf);
-      testState = measureProp;
-    }
-
-  }
-  else if (testState == measureProp)
-  {
-    if (i < PROPTEST_NBR_OF_VARIANCE_VALUES)
-    {
-      accX[i] = sensors->acc.x;
-      accY[i] = sensors->acc.y;
-      accZ[i] = sensors->acc.z;
-      if (pmGetBatteryVoltage() < minSingleLoadedVoltage[motorToTest])
-      {
-        minSingleLoadedVoltage[motorToTest] = pmGetBatteryVoltage();
-      }
-    }
-    i++;
-
-    if (i == 1)
-    {
-      motorsSetRatio(motorToTest, 0xFFFF);
-    }
-    else if (i == 50)
-    {
-      motorsSetRatio(motorToTest, 0);
-    }
-    else if (i == PROPTEST_NBR_OF_VARIANCE_VALUES)
-    {
-      accVarX[motorToTest] = variance(accX, PROPTEST_NBR_OF_VARIANCE_VALUES);
-      accVarY[motorToTest] = variance(accY, PROPTEST_NBR_OF_VARIANCE_VALUES);
-      accVarZ[motorToTest] = variance(accZ, PROPTEST_NBR_OF_VARIANCE_VALUES);
-      DEBUG_PRINTI("Motor M%d variance X+Y:%f (Z:%f)\n",
-                   motorToTest+1, (double)accVarX[motorToTest] + (double)accVarY[motorToTest],
-                   (double)accVarZ[motorToTest]);
-    }
-    else if (i >= 1000)
-    {
-      i = 0;
-      motorToTest++;
-      if (motorToTest >= NBR_OF_MOTORS)
-      {
-        i = 0;
-        motorToTest = 0;
-        testState = evaluateResult;
-        sensorsSetAccMode(ACC_MODE_FLIGHT);
-      }
-    }
-  }
-  else if (testState == testBattery)
-  {
-    if (i == 0)
-    {
-      minLoadedVoltage = idleVoltage = pmGetBatteryVoltage();
-    }
-    if (i == 1)
-    {
-      motorsSetRatio(MOTOR_M1, 0xFFFF);
-      motorsSetRatio(MOTOR_M2, 0xFFFF);
-      motorsSetRatio(MOTOR_M3, 0xFFFF);
-      motorsSetRatio(MOTOR_M4, 0xFFFF);
-    }
-    else if (i < 50)
-    {
-      if (pmGetBatteryVoltage() < minLoadedVoltage)
-        minLoadedVoltage = pmGetBatteryVoltage();
-    }
-    else if (i == 50)
-    {
-      motorsSetRatio(MOTOR_M1, 0);
-      motorsSetRatio(MOTOR_M2, 0);
-      motorsSetRatio(MOTOR_M3, 0);
-      motorsSetRatio(MOTOR_M4, 0);
-//      DEBUG_PRINT("IdleV: %f, minV: %f, M1V: %f, M2V: %f, M3V: %f, M4V: %f\n", (double)idleVoltage,
-//                  (double)minLoadedVoltage,
-//                  (double)minSingleLoadedVoltage[MOTOR_M1],
-//                  (double)minSingleLoadedVoltage[MOTOR_M2],
-//                  (double)minSingleLoadedVoltage[MOTOR_M3],
-//                  (double)minSingleLoadedVoltage[MOTOR_M4]);
-      DEBUG_PRINTI("%f %f %f %f %f %f\n", (double)idleVoltage,
-                  (double)(idleVoltage - minLoadedVoltage),
-                  (double)(idleVoltage - minSingleLoadedVoltage[MOTOR_M1]),
-                  (double)(idleVoltage - minSingleLoadedVoltage[MOTOR_M2]),
-                  (double)(idleVoltage - minSingleLoadedVoltage[MOTOR_M3]),
-                  (double)(idleVoltage - minSingleLoadedVoltage[MOTOR_M4]));
-      testState = restartBatTest;
-      i = 0;
-    }
-    i++;
-  }
-  else if (testState == restartBatTest)
-  {
-    if (i++ > 2000)
-    {
-      testState = configureAcc;
-      i = 0;
-    }
-  }
-  else if (testState == evaluateResult)
-  {
-    for (int m = 0; m < NBR_OF_MOTORS; m++)
-    {
-      if (!evaluateTest(0, PROPELLER_BALANCE_TEST_THRESHOLD,  accVarX[m] + accVarY[m], m))
-      {
-        nrFailedTests++;
-        for (int j = 0; j < 3; j++)
-        {
-          motorsBeep(m, true, testsound[m], (uint16_t)(MOTORS_TIM_BEEP_CLK_FREQ / A4)/ 20);
-          vTaskDelay(M2T(MOTORS_TEST_ON_TIME_MS));
-          motorsBeep(m, false, 0, 0);
-          vTaskDelay(M2T(100));
-        }
-      }
-    }
-#ifdef PLAY_STARTUP_MELODY_ON_MOTORS
-    if (nrFailedTests == 0)
-    {
-      for (int m = 0; m < NBR_OF_MOTORS; m++)
-      {
-        motorsBeep(m, true, testsound[m], (uint16_t)(MOTORS_TIM_BEEP_CLK_FREQ / A4)/ 20);
-        vTaskDelay(M2T(MOTORS_TEST_ON_TIME_MS));
-        motorsBeep(m, false, 0, 0);
-        vTaskDelay(M2T(MOTORS_TEST_DELAY_TIME_MS));
-      }
-    }
-#endif
-    motorTestCount++;
-    testState = testDone;
-  }
-}
-PARAM_GROUP_START(health)
-PARAM_ADD(PARAM_UINT8, startPropTest, &startPropTest)
-PARAM_GROUP_STOP(health)
-
-
 PARAM_GROUP_START(stabilizer)
 PARAM_ADD(PARAM_UINT8, estimator, &estimatorType)
 PARAM_ADD(PARAM_UINT8, controller, &controllerType)
 PARAM_ADD(PARAM_UINT8, stop, &emergencyStop)
 PARAM_GROUP_STOP(stabilizer)
-
-LOG_GROUP_START(health)
-LOG_ADD(LOG_FLOAT, motorVarXM1, &accVarX[0])
-LOG_ADD(LOG_FLOAT, motorVarYM1, &accVarY[0])
-LOG_ADD(LOG_FLOAT, motorVarXM2, &accVarX[1])
-LOG_ADD(LOG_FLOAT, motorVarYM2, &accVarY[1])
-LOG_ADD(LOG_FLOAT, motorVarXM3, &accVarX[2])
-LOG_ADD(LOG_FLOAT, motorVarYM3, &accVarY[2])
-LOG_ADD(LOG_FLOAT, motorVarXM4, &accVarX[3])
-LOG_ADD(LOG_FLOAT, motorVarYM4, &accVarY[3])
-LOG_ADD(LOG_UINT8, motorPass, &motorPass)
-LOG_ADD(LOG_UINT16, motorTestCount, &motorTestCount)
-LOG_ADD(LOG_UINT8, checkStops, &checkStops)
-LOG_GROUP_STOP(health)
 
 LOG_GROUP_START(ctrltarget)
 LOG_ADD(LOG_FLOAT, x, &setpoint.position.x)

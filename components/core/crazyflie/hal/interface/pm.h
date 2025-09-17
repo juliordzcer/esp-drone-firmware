@@ -23,7 +23,7 @@
  *
  * pm.h - Power Management driver and functions.
  */
-#ifdef 0
+#if 0
 #ifndef PM_H_
 #define PM_H_
 
