@@ -148,7 +148,8 @@ static void wifilinkTask(void *param)
         }
 
         /* command step - receive 05 send to crtpPacketDelivery queue */
-        xQueueSend(crtpPacketDelivery, &p, M2T(sendWaitMs));
+        // xQueueSend(crtpPacketDelivery, &p, M2T(sendWaitMs));
+        ASSERT(xQueueSend(crtpPacketDelivery, &p, M2T(sendWaitMs)) == pdPASS);
     }
 
 }

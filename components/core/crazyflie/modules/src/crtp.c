@@ -183,13 +183,14 @@ void crtpRxTask(void *param)
       {
         if (queues[p.port])
         {
-          if (xQueueSend(queues[p.port], &p, 0) == errQUEUE_FULL)
-          {
-            // We should never drop packet
-            printf("CRTP RX queue full\n");
-            printf("Port: %d\n", p.port);
-            ASSERT(0);
-          }
+          // if (xQueueSend(queues[p.port], &p, 0) == errQUEUE_FULL)
+          // {
+          //   // We should never drop packet
+          //   printf("CRTP RX queue full\n");
+          //   printf("Port: %d\n", p.port);
+          //   ASSERT(0);
+          // }
+          xQueueSend(queues[p.port], &p, portMAX_DELAY);          
         }
 
         if (callbacks[p.port])
