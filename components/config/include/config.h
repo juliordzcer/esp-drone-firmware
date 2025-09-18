@@ -91,6 +91,7 @@
 #define UDP_RX_TASK_PRI         2
 #define EXTRX_TASK_PRI          2
 #define UART2_TASK_PRI          2
+
 #define CRTP_SRV_TASK_PRI       0
 #define PLATFORM_SRV_TASK_PRI   0
 
