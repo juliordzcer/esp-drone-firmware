@@ -251,7 +251,7 @@ static void lhPersistDataWorker(void* arg) {
     .data = {LH_PERSIST_DATA, result}
   };
 
-  crtpSendPacket(&response);
+  crtpSendPacketBlock(&response);
 }
 
 static void lhPersistDataHandler(CRTPPacket* pk) {
