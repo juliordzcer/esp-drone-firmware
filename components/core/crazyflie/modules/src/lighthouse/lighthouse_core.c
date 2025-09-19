@@ -304,8 +304,10 @@ static void convertV2AnglesToV1Angles(pulseProcessorResult_t* angles) {
 static void usePulseResult(pulseProcessor_t *appState, pulseProcessorResult_t* angles, int basestation, int sweepId) {
   if (sweepId == sweepIdSecond) {
     const bool hasCalibrationData = pulseProcessorApplyCalibration(appState, angles, basestation);
-    const bool hasGeoData = appState->bsGeometry[basestation].valid;
-    if (hasCalibrationData && hasGeoData) {
+    // const bool hasGeoData = appState->bsGeometry[basestation].valid;
+    // if (hasCalibrationData && hasGeoData) {
+    if (hasCalibrationData) {
+
       if (lighthouseBsTypeV2 == angles->measurementType) {
         // Emulate V1 base stations for now, convert to V1 angles
         convertV2AnglesToV1Angles(angles);
@@ -314,17 +316,32 @@ static void usePulseResult(pulseProcessor_t *appState, pulseProcessorResult_t* a
       // Send measurement to the ground
       locSrvSendLighthouseAngle(basestation, angles);
 
-      baseStationActiveMapWs = baseStationActiveMapWs | (1 << basestation);
+      // baseStationActiveMapWs = baseStationActiveMapWs | (1 << basestation);
 
-      switch(estimationMethod) {
-        case 0:
-          usePulseResultCrossingBeams(appState, angles, basestation);
-          break;
-        case 1:
-          usePulseResultSweeps(appState, angles, basestation);
-          break;
-        default:
-          break;
+      // switch(estimationMethod) {
+      //   case 0:
+      //     usePulseResultCrossingBeams(appState, angles, basestation);
+      //     break;
+      //   case 1:
+      //     usePulseResultSweeps(appState, angles, basestation);
+      //     break;
+      //   default:
+      //     break;
+      const bool hasGeoData = appState->bsGeometry[basestation].valid;
+      if (hasGeoData) {
+        baseStationActiveMapWs = baseStationActiveMapWs | (1 << basestation);
+
+        switch(estimationMethod) {
+          case 0:
+            usePulseResultCrossingBeams(appState, angles, basestation);
+            break;
+          case 1:
+            usePulseResultSweeps(appState, angles, basestation);
+            break;
+          default:
+            break;
+        }
+
       }
     }
 
