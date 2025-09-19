@@ -842,7 +842,7 @@ void sensorsBmi088SpiBmp388Init(void)
       return;
     }
 
-  i2cdevInit(I2C3_DEV);
+  // i2cdevInit(I2C3_DEV);
   spiInit();
   spiDMAInit();
 
