@@ -58,7 +58,10 @@ logVarId_t logGetVarId(char* group, char* name);
  * @param varId variable ID, returned by logGetLogId()
  * @return true if the variable ID is valid, false otherwise.
  */
-#define LOG_VARID_IS_VALID(varId) (varId != 0xffffu)
+// #define LOG_VARID_IS_VALID(varId) (varId != 0xffffu)
+inline bool logVarIdIsValid(logVarId_t varId) {
+  return varId != 0xffffu;
+}
 
 /** Return the logging type
  * 
