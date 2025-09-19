@@ -37,7 +37,12 @@
 #define DEBUG_MODULE "PWR_DIST"
 #include "debug_cf.h"
 
-static bool motorSetEnable = false;
+// static bool motorSetEnable = false;
+
+// 0 - disable
+// 1 - individual motor power
+// 2 - all motors use m1 variable setting
+static uint8_t motorSetEnable = 0;
 
 static struct {
   uint32_t m1;
@@ -103,12 +108,18 @@ void powerDistribution(const control_t *control)
                                control->yaw);
   #endif
 
-  if (motorSetEnable)
+  // if (motorSetEnable)
+  if (motorSetEnable == 1)
   {
     motorsSetRatio(MOTOR_M1, motorPowerSet.m1);
     motorsSetRatio(MOTOR_M2, motorPowerSet.m2);
     motorsSetRatio(MOTOR_M3, motorPowerSet.m3);
     motorsSetRatio(MOTOR_M4, motorPowerSet.m4);
+  } else if (motorSetEnable == 2) {
+    motorsSetRatio(MOTOR_M1, motorPowerSet.m1);
+    motorsSetRatio(MOTOR_M2, motorPowerSet.m1);
+    motorsSetRatio(MOTOR_M3, motorPowerSet.m1);
+    motorsSetRatio(MOTOR_M4, motorPowerSet.m1);
   }
   else
   {

@@ -38,7 +38,7 @@
 
 #include "usec_time.h"
 
-#define TICK_PER_US (FREERTOS_MCU_CLOCK_HZ / (8 * 1e6))
+// #define TICK_PER_US (FREERTOS_MCU_CLOCK_HZ / (8 * 1e6))
 
 static bool isInit = false;
 

@@ -85,6 +85,7 @@
 #include "mm_position.h"
 #include "mm_pose.h"
 #include "mm_tdoa.h"
+#include "mm_tdoa_robust.h"
 #include "mm_flow.h"
 #include "mm_tof.h"
 #include "mm_yaw_error.h"

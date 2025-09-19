@@ -64,7 +64,7 @@ static void GM_state(float e, float * GM_e){
 void kalmanCoreRobustUpdateWithTDOA(kalmanCoreData_t* this, tdoaMeasurement_t *tdoa)
 {
     // Measurement equation:
-    // dR = dT + d1 - d0
+    // d_ij = d_j - d_i
 
 	float measurement = 0.0f;
     float x = this->S[KC_STATE_X];   
@@ -85,7 +85,11 @@ void kalmanCoreRobustUpdateWithTDOA(kalmanCoreData_t* this, tdoaMeasurement_t *t
         measurement = tdoa->distanceDiff;
         
         // innovation term based on x_check
-        float error_check = measurement - predicted;    // error_check
+        // float error_check = measurement - predicted;    // error_check
+
+        // innovation term based on prior x
+        float error_check = measurement - predicted;    // innovation term based on prior state
+        
         // ---------------------- matrix defination ----------------------------- //
         static float P_chol[KC_STATE_DIM][KC_STATE_DIM]; 
         static xtensa_matrix_instance_f32 Pc_m = {KC_STATE_DIM, KC_STATE_DIM, (float *)P_chol};
@@ -149,13 +153,14 @@ void kalmanCoreRobustUpdateWithTDOA(kalmanCoreData_t* this, tdoaMeasurement_t *t
             // X_state updates in each iteration
             float x_iter = X_state[KC_STATE_X],  y_iter = X_state[KC_STATE_Y], z_iter = X_state[KC_STATE_Z];   
 
-            float dx1 = x_iter - x1;  float dy1 = y_iter - y1;   float dz1 = z_iter - z1;
-            float dx0 = x_iter - x0;  float dy0 = y_iter - y0;   float dz0 = z_iter - z0;
+            dx1 = x_iter - x1;  float dy1 = y_iter - y1;   float dz1 = z_iter - z1;
+            dx0 = x_iter - x0;  float dy0 = y_iter - y0;   float dz0 = z_iter - z0;
 
-            float d1 = sqrtf(powf(dx1, 2) + powf(dy1, 2) + powf(dz1, 2));
-            float d0 = sqrtf(powf(dx0, 2) + powf(dy0, 2) + powf(dz0, 2));
+            d1 = sqrtf(powf(dx1, 2) + powf(dy1, 2) + powf(dz1, 2));
+            d0 = sqrtf(powf(dx0, 2) + powf(dy0, 2) + powf(dz0, 2));
             
             float predicted_iter = d1 - d0;                         // predicted measurements in each iteration based on X_state
+            
             float error_iter = measurement - predicted_iter;        // innovation term based on X_state
 
             float e_y = error_iter;
