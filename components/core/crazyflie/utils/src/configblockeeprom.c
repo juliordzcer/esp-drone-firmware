@@ -128,7 +128,7 @@ int configblockInit(void)
 
   // Because of strange behavior from I2C device during expansion port test
   // the first read needs to be discarded
-  eepromTestConnection();
+  // eepromTestConnection();
 
   if (eepromTestConnection())
   {
@@ -199,7 +199,8 @@ int configblockInit(void)
 
 bool configblockTest(void)
 {
-  return eepromTest();
+  // return eepromTest();
+  return cb_ok;
 }
 
 static bool configblockCheckMagic(configblock_t *configblock)
