@@ -188,6 +188,8 @@ void systemTask(void *arg)
   uart2Init(115200);
 #endif
 
+  initUsecTimer();
+
   i2cdevInit(I2C0_DEV);
   i2cdevInit(I2C1_DEV);
 

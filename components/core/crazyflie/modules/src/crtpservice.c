@@ -39,7 +39,6 @@
 #include "stm32_legacy.h"
 
 
-
 typedef enum {
   linkEcho   = 0x00,
   linkSource = 0x01,
@@ -104,6 +103,7 @@ static void crtpSrvTask(void* prm)
 PARAM_GROUP_START(crtpsrv)
 PARAM_ADD(PARAM_UINT16, echoDelay, &echoDelay)
 PARAM_GROUP_STOP(crtpsrv)
+
 
 // typedef enum {
 //   linkEcho   = 0x00,

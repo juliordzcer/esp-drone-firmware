@@ -33,7 +33,9 @@
 #include "config.h"
 #include "crtp.h"
 #include "param.h"
-#include "crc.h"
+// #include "crc.h"
+#include "crc32.h"
+
 #include "console.h"
 #define DEBUG_MODULE "PARAM"
 #include "debug_cf.h"
@@ -142,7 +144,9 @@ void paramInit(void)
       memcpy(&p.data[5], params[i].name, strlen(params[i].name));
       len += strlen(params[i].name);
     }
-    paramsCrc = crcSlow(p.data, len);
+    // paramsCrc = crcSlow(p.data, len);
+    paramsCrc = crc32CalculateBuffer(p.data, len);
+ 
   }
 
   for (i=0; i<paramsLen; i++)

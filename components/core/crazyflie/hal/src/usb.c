@@ -205,6 +205,7 @@ static uint8_t  usbd_cf_Init (void  *pdev,
                    (uint8_t*)(inPacket.data),
                    USB_RX_TX_PACKET_SIZE);
   rxStopped = false;
+
   return USBD_OK;
 }
 
@@ -289,13 +290,12 @@ static uint8_t  usbd_cf_DataOut (void *pdev, uint8_t epnum)
   /* Get the received data buffer and update the counter */
   inPacket.size = ((USB_OTG_CORE_HANDLE*)pdev)->dev.out_ep[epnum].xfer_count;
 
-  // xQueueSendFromISR(usbDataRx, &inPacket, &xHigherPriorityTaskWoken);
-
   if (xQueueSendFromISR(usbDataRx, &inPacket, &xHigherPriorityTaskWoken) == pdTRUE) {
     result = USBD_OK;
   } else {
     result = USBD_BUSY;
-  }  
+  }
+
   if (!xQueueIsQueueFullFromISR(usbDataRx)) {
     /* Prepare Out endpoint to receive next packet */
     DCD_EP_PrepareRx(pdev,
@@ -432,7 +432,8 @@ bool usbGetDataBlocking(USBPacket *in)
     rxStopped = false;
   }
   NVIC_EnableIRQ(OTG_FS_IRQn);
-    return true;
+
+  return true;
 }
 
 static USBPacket outStage;

@@ -29,14 +29,13 @@
 
 #include "pca9555.h"
 
-#include "debug_cf.h"
+#include "debug.h"
 
 static uint8_t devAddr;
 static I2C_Dev *I2Cx;
 
 void pca9555Init()
 {
-  // i2cdevInit(I2C1_DEV);
   I2Cx = I2C1_DEV;
   devAddr = PCA9555_DEFAULT_ADDRESS;
 }

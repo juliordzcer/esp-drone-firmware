@@ -362,7 +362,7 @@ static bstdr_ret_t spi_burst_write(uint8_t dev_id, uint8_t reg_addr, uint8_t *re
 static bstdr_ret_t i2c_burst_read(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len)
 {
   /**< Burst read code comes here */
-  if (i2cdevReadReg8(I2C3_DEV, dev_id, reg_addr, (uint16_t) len, reg_data))
+  if (i2cdevReadReg8(I2C0_DEV, dev_id, reg_addr, (uint16_t) len, reg_data))
   {
     return BSTDR_OK;
   }
@@ -375,7 +375,7 @@ static bstdr_ret_t i2c_burst_read(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg
 static bstdr_ret_t i2c_burst_write(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len)
 {
   /**< Burst write code comes here */
-  if (i2cdevWriteReg8(I2C3_DEV, dev_id,reg_addr,(uint16_t) len, reg_data))
+  if (i2cdevWriteReg8(I2C0_DEV, dev_id,reg_addr,(uint16_t) len, reg_data))
   {
     return BSTDR_OK;
   }
@@ -842,7 +842,6 @@ void sensorsBmi088SpiBmp388Init(void)
       return;
     }
 
-  // i2cdevInit(I2C3_DEV);
   spiInit();
   spiDMAInit();
 

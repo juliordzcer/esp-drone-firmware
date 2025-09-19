@@ -225,7 +225,7 @@ static void sensorsTask(void *param)
               (isMagnetometerPresent ? SENSORS_MAG_BUFF_LEN : 0) +
               (isBarometerPresent ? SENSORS_BARO_BUFF_LEN : 0));
 
-      i2cdevReadReg8(I2C3_DEV, MPU6500_ADDRESS_AD0_HIGH, MPU6500_RA_ACCEL_XOUT_H, dataLen, buffer);
+      i2cdevReadReg8(I2C0_DEV, MPU6500_ADDRESS_AD0_HIGH, MPU6500_RA_ACCEL_XOUT_H, dataLen, buffer);
       // these functions process the respective data and queue it on the output queues
       processAccGyroMeasurements(&(buffer[0]));
       if (isMagnetometerPresent)
@@ -334,8 +334,7 @@ static void sensorsDeviceInit(void)
   // Wait for sensors to startup
   while (xTaskGetTickCount() < 1000);
 
-  // i2cdevInit(I2C3_DEV);
-  mpu6500Init(I2C3_DEV);
+  mpu6500Init(I2C0_DEV);
   if (mpu6500TestConnection() == true)
   {
     DEBUG_PRINT("MPU9250 I2C connection [OK].\n");
@@ -391,7 +390,7 @@ static void sensorsDeviceInit(void)
 
 
 #ifdef SENSORS_ENABLE_MAG_AK8963
-  ak8963Init(I2C3_DEV);
+  ak8963Init(I2C0_DEV);
   if (ak8963TestConnection() == true)
   {
     isMagnetometerPresent = true;
@@ -405,7 +404,7 @@ static void sensorsDeviceInit(void)
 #endif
 
 #ifdef SENSORS_ENABLE_PRESSURE_LPS25H
-  lps25hInit(I2C3_DEV);
+  lps25hInit(I2C0_DEV);
   if (lps25hTestConnection() == true)
   {
     lps25hSetEnabled(true);
