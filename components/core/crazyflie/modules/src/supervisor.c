@@ -32,6 +32,7 @@
 #include "pm.h"
 #include "pm_esplane.h"
 #include "supervisor.h"
+#include "stabilizer.h"
 
 /* Minimum summed motor PWM that means we are flying */
 #define SUPERVISOR_FLIGHT_THRESHOLD 1000
