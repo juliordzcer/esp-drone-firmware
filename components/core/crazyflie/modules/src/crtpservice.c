@@ -35,6 +35,9 @@
 #include "crtp.h"
 #include "crtpservice.h"
 #include "static_mem.h"
+#include "param.h"
+#include "stm32_legacy.h"
+
 
 
 typedef enum {
@@ -45,6 +48,7 @@ typedef enum {
 
 
 static bool isInit=false;
+static uint16_t echoDelay=0;
 STATIC_MEM_TASK_ALLOC_STACK_NO_DMA_CCM_SAFE(crtpSrvTask, CRTP_SRV_TASK_STACKSIZE);
 
 static void crtpSrvTask(void*);
@@ -77,6 +81,9 @@ static void crtpSrvTask(void* prm)
     switch (p.channel)
     {
       case linkEcho:
+        if (echoDelay > 0) {
+          vTaskDelay(M2T(echoDelay));
+        }
         crtpSendPacketBlock(&p);
         break;
       case linkSource:
@@ -93,3 +100,64 @@ static void crtpSrvTask(void* prm)
     }
   }
 }
+
+PARAM_GROUP_START(crtpsrv)
+PARAM_ADD(PARAM_UINT16, echoDelay, &echoDelay)
+PARAM_GROUP_STOP(crtpsrv)
+
+// typedef enum {
+//   linkEcho   = 0x00,
+//   linkSource = 0x01,
+//   linkSink   = 0x02,
+// } LinkNbr;
+
+
+// static bool isInit=false;
+// STATIC_MEM_TASK_ALLOC_STACK_NO_DMA_CCM_SAFE(crtpSrvTask, CRTP_SRV_TASK_STACKSIZE);
+
+// static void crtpSrvTask(void*);
+
+// void crtpserviceInit(void)
+// {
+//   if (isInit)
+//     return;
+
+//   //Start the task
+//   STATIC_MEM_TASK_CREATE(crtpSrvTask, crtpSrvTask, CRTP_SRV_TASK_NAME, NULL, CRTP_SRV_TASK_PRI);
+
+//   isInit = true;
+// }
+
+// bool crtpserviceTest(void)
+// {
+//   return isInit;
+// }
+
+// static void crtpSrvTask(void* prm)
+// {
+//   static CRTPPacket p;
+
+//   crtpInitTaskQueue(CRTP_PORT_LINK);
+
+//   while(1) {
+//     crtpReceivePacketBlock(CRTP_PORT_LINK, &p);
+
+//     switch (p.channel)
+//     {
+//       case linkEcho:
+//         crtpSendPacketBlock(&p);
+//         break;
+//       case linkSource:
+//         p.size = CRTP_MAX_DATA_SIZE;
+//         bzero(p.data, CRTP_MAX_DATA_SIZE);
+//         strcpy((char*)p.data, "Bitcraze Crazyflie");
+//         crtpSendPacketBlock(&p);
+//         break;
+//       case linkSink:
+//         /* Ignore packet */
+//         break;
+//       default:
+//         break;
+//     }
+//   }
+// }
