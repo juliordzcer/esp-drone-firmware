@@ -70,6 +70,9 @@
 #include "sensors.h"
 #include "static_mem.h"
 
+#include "supervisor.h"
+
+
 #include "system.h"
 #include "log.h"
 #include "param.h"
@@ -243,8 +246,8 @@ static uint32_t thrustAccumulatorCount;
 static uint32_t gyroAccumulatorCount;
 static uint32_t baroAccumulatorCount;
 static bool quadIsFlying = false;
-static uint32_t lastFlightCmd;
-static uint32_t takeoffTime;
+// static uint32_t lastFlightCmd;
+// static uint32_t takeoffTime;
 
 // static OutlierFilterLhState_t sweepOutlierFilterState;
 
@@ -509,15 +512,7 @@ static bool predictStateForward(uint32_t osTick, float dt) {
 
   xSemaphoreGive(dataMutex);
 
-  // TODO: Find a better check for whether the quad is flying
-  // Assume that the flight begins when the thrust is large enough and for now we never stop "flying".
-  if (thrustAverage > IN_FLIGHT_THRUST_THRESHOLD) {
-    lastFlightCmd = osTick;
-    if (!quadIsFlying) {
-      takeoffTime = lastFlightCmd;
-    }
-  }
-  quadIsFlying = (osTick-lastFlightCmd) < IN_FLIGHT_TIME_THRESHOLD;
+  quadIsFlying = supervisorIsFlying();
 
   kalmanCorePredict(&coreData, thrustAverage, &accAverage, &gyroAverage, dt, quadIsFlying);
 

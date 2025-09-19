@@ -26,6 +26,8 @@
 #define DEBUG_MODULE "STAB"
 #include "debug_cf.h"
 #include "static_mem.h"
+#include "supervisor.h"
+
 
 static bool isInit;
 static bool emergencyStop = false;
@@ -204,7 +206,8 @@ static void stabilizerTask(void* param)
       controller(&control, &setpoint, &sensorData, &state, tick);
 
       checkEmergencyStopTimeout();
-
+      supervisorUpdate();
+      
       if (emergencyStop) {
         powerStop();
       } else {

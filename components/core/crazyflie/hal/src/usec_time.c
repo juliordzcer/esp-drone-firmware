@@ -25,9 +25,10 @@
  *
  * usec_time.c - microsecond-resolution timer and timestamps.
  */
-
+#include <stdbool.h>
 #include "usec_time.h"
 #include "esp_timer.h"
+
 void initUsecTimer(void)
 {
 

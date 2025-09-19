@@ -59,7 +59,9 @@ logVarId_t logGetVarId(char* group, char* name);
  * @return true if the variable ID is valid, false otherwise.
  */
 // #define LOG_VARID_IS_VALID(varId) (varId != 0xffffu)
-inline bool logVarIdIsValid(logVarId_t varId) {
+// inline bool logVarIdIsValid(logVarId_t varId) {
+
+static inline bool logVarIdIsValid(logVarId_t varId) {
   return varId != 0xffffu;
 }
 

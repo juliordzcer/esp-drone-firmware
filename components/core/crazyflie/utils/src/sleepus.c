@@ -51,5 +51,6 @@ void sleepus(uint32_t us)
 
   uint64_t start = usecTimestamp();
 
-  while ((start+us) > usecTimestamp());
+  while ((start+us) > usecTimestamp()) {
+  }
 }

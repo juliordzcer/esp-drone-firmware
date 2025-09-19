@@ -23,9 +23,8 @@
  *
  * sleepus.h: Micro second sleep
  */
-#ifndef __SLEEPNS_H__
-#define __SLEEPNS_H__
+#pragma once
+#include <stdint.h>
 
 void sleepus(uint32_t us);
 
-#endif // __SLEEPNS_H__

@@ -35,6 +35,7 @@
 #include "commander.h"
 #include "stabilizer.h"
 #include "motors.h"
+#include "supervisor.h"
 
 /* Trigger object used to detect Free Fall situation. */
 static trigger_t sitAwFFAccWZ;
@@ -117,13 +118,8 @@ static void sitAwPostStateUpdateCallOut(const sensorData_t *sensorData,
   sitAwFFTest(state->acc.z, accMAG);
 #endif
 #ifdef SITAW_TU_ENABLED
-  /* check if we actually fly */
-  int sumRatio = 0;
-  for (int i = 0; i < NBR_OF_MOTORS; ++i) {
-    sumRatio += motorsGetRatio(i);
-  }
-  bool isFlying = sumRatio > SITAW_TU_IN_FLIGHT_THRESHOLD;
-  if (isFlying) {
+
+  if (supervisorIsFlying()) {
     /* Test values for Tumbled detection. */
     sitAwTuTest(sensorData->acc.z);
   }
