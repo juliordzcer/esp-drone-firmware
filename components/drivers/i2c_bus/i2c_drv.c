@@ -1,34 +1,3 @@
-/**
- * ESP-Drone Firmware
- *
- * Copyright 2019-2020  Espressif Systems (Shanghai)
- * Copyright (c) 2014, Bitcraze AB, All rights reserved.
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3.0 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library.
- *
- * i2c_drv.c - i2c driver implementation
- *
- * @note
- * For some reason setting CR1 reg in sequence with
- * I2C_AcknowledgeConfig(I2C_SENSORS, ENABLE) and after
- * I2C_GenerateSTART(I2C_SENSORS, ENABLE) sometimes creates an
- * instant start->stop condition (3.9us long) which I found out with an I2C
- * analyzer. This fast start->stop is only possible to generate if both
- * start and stop flag is set in CR1 at the same time. So i tried setting the CR1
- * at once with I2C_SENSORS->CR1 = (I2C_CR1_START | I2C_CR1_ACK | I2C_CR1_PE) and the
- * problem is gone. Go figure...
- */
 
 
 #include <string.h>

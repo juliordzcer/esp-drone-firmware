@@ -188,7 +188,7 @@ void systemTask(void *arg)
   uart2Init(115200);
 #endif
 
-  // i2cdevInit(I2C3_DEV);
+  i2cdevInit(I2C0_DEV);
   i2cdevInit(I2C1_DEV);
 
   //Init the high-levels modules

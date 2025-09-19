@@ -27,6 +27,7 @@
  THE SOFTWARE.
  ===============================================
  */
+#define DEBUG_MODULE "MPU6050"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -35,7 +36,6 @@
 #include "mpu6050.h"
 #include "eprintf.h"
 #include "stm32_legacy.h"
-#define DEBUG_MODULE "MPU6050"
 #include "debug_cf.h"
 
 static uint8_t devAddr;
