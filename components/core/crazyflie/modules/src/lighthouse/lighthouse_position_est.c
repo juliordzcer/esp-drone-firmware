@@ -68,6 +68,8 @@ static const MemoryHandlerDef_t memDef = {
   .write = handleMemWrite,
 };
 
+static uint16_t baseStationGeoValidMap;
+
 void lighthousePositionEstInit() {
   for (int i = 0; i < PULSE_PROCESSOR_N_BASE_STATIONS; i++) {
     lighthousePositionGeometryDataUpdated(i);
@@ -145,9 +147,16 @@ static bool handleMemWrite(const uint32_t memAddr, const uint8_t writeLen, const
 }
 
 static void lighthousePositionGeometryDataUpdated(const int baseStation) {
+  const uint16_t basestationBitMap = (1 << baseStation);
+
   if (lighthouseCoreState.bsGeometry[baseStation].valid) {
     baseStationGeometryCache_t* cache = &lighthouseCoreState.bsGeoCache[baseStation];
     preProcessGeometryData(lighthouseCoreState.bsGeometry[baseStation].mat, cache->baseStationInvertedRotationMatrixes, cache->lh1Rotor2RotationMatrixes, cache->lh1Rotor2InvertedRotationMatrixes);
+
+    baseStationGeoValidMap |= basestationBitMap;
+  } else {
+    baseStationGeoValidMap &= ~basestationBitMap;
+
   }
 }
 
@@ -414,6 +423,7 @@ LOG_ADD(LOG_FLOAT, y, &position[1])
 LOG_ADD(LOG_FLOAT, z, &position[2])
 
 LOG_ADD(LOG_FLOAT, delta, &deltaLog)
+LOG_ADD(LOG_UINT16, bsGeo, &baseStationGeoValidMap)
 LOG_GROUP_STOP(lighthouse)
 
 PARAM_GROUP_START(lighthouse)

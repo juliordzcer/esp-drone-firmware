@@ -85,6 +85,14 @@ static statsCntRateLogger_t* bsRates[PULSE_PROCESSOR_N_BASE_STATIONS] = {&bs0Rat
 
 // Contains a bit map that indicates which base staions that are actively used, that is recevied
 // and has valid geo and calib dats
+
+// A bit map that indicates which base staions that are received
+static uint16_t baseStationReceivedMapWs;
+static uint16_t baseStationReceivedMap;
+
+// A bit map that indicates which base staions that are actively used in the estimation process, that is recevied
+// and has valid geo and calib data
+
 static uint16_t baseStationActiveMapWs;
 static uint16_t baseStationActiveMap;
 
@@ -302,6 +310,9 @@ static void convertV2AnglesToV1Angles(pulseProcessorResult_t* angles) {
 }
 
 static void usePulseResult(pulseProcessor_t *appState, pulseProcessorResult_t* angles, int basestation, int sweepId) {
+  const uint16_t basestationBitMap = (1 << basestation);
+  baseStationReceivedMapWs |= basestationBitMap;
+
   if (sweepId == sweepIdSecond) {
     const bool hasCalibrationData = pulseProcessorApplyCalibration(appState, angles, basestation);
     // const bool hasGeoData = appState->bsGeometry[basestation].valid;
@@ -329,8 +340,8 @@ static void usePulseResult(pulseProcessor_t *appState, pulseProcessorResult_t* a
       //     break;
       const bool hasGeoData = appState->bsGeometry[basestation].valid;
       if (hasGeoData) {
-        baseStationActiveMapWs = baseStationActiveMapWs | (1 << basestation);
-
+        // baseStationActiveMapWs = baseStationActiveMapWs | (1 << basestation);
+        baseStationActiveMapWs |= basestationBitMap;
         switch(estimationMethod) {
           case 0:
             usePulseResultCrossingBeams(appState, angles, basestation);
@@ -443,6 +454,11 @@ static void deckHealthCheck(pulseProcessor_t *appState, const lighthouseUartFram
 
 static void updateSystemStatus(const uint32_t now_ms) {
   if (now_ms > nextUpdateTimeOfSystemStatus) {
+
+    baseStationReceivedMap = baseStationReceivedMapWs;
+    baseStationReceivedMapWs = 0;
+
+
     baseStationActiveMap = baseStationActiveMapWs;
     baseStationActiveMapWs = 0;
 
@@ -636,7 +652,7 @@ LOG_ADD(LOG_UINT16, width2, &pulseWidth[2])
 LOG_ADD(LOG_UINT16, width3, &pulseWidth[3])
 
 LOG_ADD(LOG_UINT8, comSync, &uartSynchronized)
-
+LOG_ADD(LOG_UINT16, bsReceive, &baseStationReceivedMap)
 LOG_ADD(LOG_UINT16, bsActive, &baseStationActiveMap)
 LOG_ADD(LOG_UINT8, status, &systemStatus)
 LOG_GROUP_STOP(lighthouse)
