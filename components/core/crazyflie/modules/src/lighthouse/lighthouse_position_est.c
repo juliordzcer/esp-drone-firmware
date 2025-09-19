@@ -70,6 +70,19 @@ static const MemoryHandlerDef_t memDef = {
 
 static uint16_t baseStationGeoValidMap;
 
+// A bitmap indicating which base stations that have valid calibration data
+static uint16_t baseStationCalibValidMap;
+
+static void modifyBit(uint16_t *bitmap, const int index, const bool value) {
+  const uint16_t mask = (1 << index);
+
+  if (value) {
+    *bitmap |= mask;
+  } else {
+    *bitmap &= ~mask;
+  }
+}
+
 void lighthousePositionEstInit() {
   for (int i = 0; i < PULSE_PROCESSOR_N_BASE_STATIONS; i++) {
     lighthousePositionGeometryDataUpdated(i);
@@ -135,8 +148,16 @@ static bool handleMemWrite(const uint32_t memAddr, const uint8_t writeLen, const
     uint32_t inPageAddr = calibOffsetAddr % pageSize;
     if (index < PULSE_PROCESSOR_N_BASE_STATIONS) {
       if (inPageAddr + writeLen <= sizeof(lighthouseCalibration_t)) {
+
+        // Mark the calibration data as invalid since this write probably only will update part of it
+        // If this is the last write in this block, the valid flag will be part of the data and set appropriately
+        // This is based on the assumption that the writes are done in oder with increasing addresses
+        lighthouseCoreState.bsCalibration[index].valid = false;
+
+
         uint8_t* start = (uint8_t*)&lighthouseCoreState.bsCalibration[index];
         memcpy(start + inPageAddr, buffer, writeLen);
+        lighthousePositionCalibrationDataWritten(index);
 
         result = true;
       }
@@ -146,18 +167,26 @@ static bool handleMemWrite(const uint32_t memAddr, const uint8_t writeLen, const
   return result;
 }
 
-static void lighthousePositionGeometryDataUpdated(const int baseStation) {
-  const uint16_t basestationBitMap = (1 << baseStation);
+// static void lighthousePositionGeometryDataUpdated(const int baseStation) {
+//   const uint16_t basestationBitMap = (1 << baseStation);
 
+void lighthousePositionCalibrationDataWritten(const uint8_t baseStation) {
+  if (baseStation < PULSE_PROCESSOR_N_BASE_STATIONS) {
+    modifyBit(&baseStationCalibValidMap, baseStation, lighthouseCoreState.bsCalibration[baseStation].valid);
+  }
+}
+
+static void lighthousePositionGeometryDataUpdated(const int baseStation) {
   if (lighthouseCoreState.bsGeometry[baseStation].valid) {
     baseStationGeometryCache_t* cache = &lighthouseCoreState.bsGeoCache[baseStation];
     preProcessGeometryData(lighthouseCoreState.bsGeometry[baseStation].mat, cache->baseStationInvertedRotationMatrixes, cache->lh1Rotor2RotationMatrixes, cache->lh1Rotor2InvertedRotationMatrixes);
 
-    baseStationGeoValidMap |= basestationBitMap;
-  } else {
-    baseStationGeoValidMap &= ~basestationBitMap;
+  //   baseStationGeoValidMap |= basestationBitMap;
+  // } else {
+  //   baseStationGeoValidMap &= ~basestationBitMap;
 
   }
+  modifyBit(&baseStationGeoValidMap, baseStation, lighthouseCoreState.bsGeometry[baseStation].valid);
 }
 
 void lighthousePositionSetGeometryData(const uint8_t baseStation, const baseStationGeometry_t* geometry) {
@@ -424,6 +453,7 @@ LOG_ADD(LOG_FLOAT, z, &position[2])
 
 LOG_ADD(LOG_FLOAT, delta, &deltaLog)
 LOG_ADD(LOG_UINT16, bsGeo, &baseStationGeoValidMap)
+LOG_ADD(LOG_UINT16, bsCalibVal, &baseStationCalibValidMap)
 LOG_GROUP_STOP(lighthouse)
 
 PARAM_GROUP_START(lighthouse)
