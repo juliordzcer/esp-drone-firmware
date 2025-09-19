@@ -393,6 +393,19 @@ TESTABLE_STATIC lighthouseBaseStationType_t identifyBaseStationType(const lighth
     return lighthouseBsTypeUnknown;
 }
 
+
+static void useCalibrationData(pulseProcessor_t *appState) {
+  for (int baseStation = 0; baseStation < PULSE_PROCESSOR_N_BASE_STATIONS; baseStation++) {
+    if (appState->ootxDecoder[baseStation].isFullyDecoded) {
+      if (! appState->bsCalibration[baseStation].valid) {
+        DEBUG_PRINT("Got calibration from %08X on channel %d\n", (unsigned int)appState->ootxDecoder[baseStation].frame.id, baseStation);
+        lighthouseCalibrationInitFromFrame(&appState->bsCalibration[baseStation], &appState->ootxDecoder[baseStation].frame);
+      }
+    }
+  }
+}
+
+
 static pulseProcessorProcessPulse_t identifySystem(const lighthouseUartFrame_t* frame, lighthouseBsIdentificationData_t* bsIdentificationData) {
   pulseProcessorProcessPulse_t result = (void*)0;
 
@@ -416,13 +429,18 @@ static pulseProcessorProcessPulse_t identifySystem(const lighthouseUartFrame_t* 
 static void processFrame(pulseProcessor_t *appState, pulseProcessorResult_t* angles, const lighthouseUartFrame_t* frame) {
     int basestation;
     int sweepId;
+    bool calibDataIsDecoded = false;    
 
     pulseWidth[frame->data.sensor] = frame->data.width;
 
-    if (pulseProcessorProcessPulse(appState, &frame->data, angles, &basestation, &sweepId)) {
+    // if (pulseProcessorProcessPulse(appState, &frame->data, angles, &basestation, &sweepId)) {
+    if (pulseProcessorProcessPulse(appState, &frame->data, angles, &basestation, &sweepId, &calibDataIsDecoded)) {
         STATS_CNT_RATE_EVENT(bsRates[basestation]);
         usePulseResult(appState, angles, basestation, sweepId);
     }
+    if (calibDataIsDecoded) {
+      useCalibrationData(appState);
+    }    
 }
 
 static void deckHealthCheck(pulseProcessor_t *appState, const lighthouseUartFrame_t* frame, const uint32_t now_ms) {
