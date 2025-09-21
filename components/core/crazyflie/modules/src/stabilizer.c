@@ -27,14 +27,17 @@
 #include "debug_cf.h"
 #include "static_mem.h"
 #include "supervisor.h"
-
+#include "rateSupervisor.h"
 
 static bool isInit;
 static bool emergencyStop = false;
 static int emergencyStopTimeout = EMERGENCY_STOP_TIMEOUT_DISABLED;
 
+static bool checkStops;
+
 uint32_t inToOutLatency;
 
+// State variables for the stabilizer
 static setpoint_t setpoint;
 static sensorData_t sensorData;
 static state_t state;
@@ -44,19 +47,43 @@ static StateEstimatorType estimatorType;
 static ControllerType controllerType;
 
 static STATS_CNT_RATE_DEFINE(stabilizerRate, 500);
+static rateSupervisor_t rateSupervisorContext;
+static bool rateWarningDisplayed = false;
 
 static struct {
-  int16_t x, y, z;
-  int16_t vx, vy, vz;
-  int16_t ax, ay, az;
+  // position - mm
+  int16_t x;
+  int16_t y;
+  int16_t z;
+  // velocity - mm / sec
+  int16_t vx;
+  int16_t vy;
+  int16_t vz;
+  // acceleration - mm / sec^2
+  int16_t ax;
+  int16_t ay;
+  int16_t az;
+  // compressed quaternion, see quatcompress.h
   int32_t quat;
-  int16_t rateRoll, ratePitch, rateYaw;
+  // angular velocity - milliradians / sec
+  int16_t rateRoll;
+  int16_t ratePitch;
+  int16_t rateYaw;
 } stateCompressed;
 
 static struct {
-  int16_t x, y, z;
-  int16_t vx, vy, vz;
-  int16_t ax, ay, az;
+  // position - mm
+  int16_t x;
+  int16_t y;
+  int16_t z;
+  // velocity - mm / sec
+  int16_t vx;
+  int16_t vy;
+  int16_t vz;
+  // acceleration - mm / sec^2
+  int16_t ax;
+  int16_t ay;
+  int16_t az;
 } setpointCompressed;
 
 STATIC_MEM_TASK_ALLOC(stabilizerTask, STABILIZER_TASK_STACKSIZE);
@@ -117,13 +144,10 @@ void stabilizerInit(StateEstimatorType estimator)
     return;
 
   sensorsInit();
-  if (estimator == anyEstimator) {
-    estimator = deckGetRequiredEstimator();
-  }
   stateEstimatorInit(estimator);
   controllerInit(ControllerTypeAny);
   powerDistributionInit();
-  // sitAwInit();
+  // collisionAvoidanceInit();
   estimatorType = getStateEstimator();
   controllerType = getControllerType();
 
@@ -140,6 +164,7 @@ bool stabilizerTest(void)
   pass &= stateEstimatorTest();
   pass &= controllerTest();
   pass &= powerDistributionTest();
+  // pass &= collisionAvoidanceTest();
 
   return pass;
 }
@@ -155,10 +180,18 @@ static void checkEmergencyStopTimeout()
   }
 }
 
+/* The stabilizer loop runs at 1kHz (stock) or 500Hz (kalman). It is the
+ * responsibility of the different functions to run slower by skipping call
+ * (ie. returning without modifying the output structure).
+ */
+
 static void stabilizerTask(void* param)
 {
   uint32_t tick;
   uint32_t lastWakeTime;
+
+
+  // vTaskSetApplicationTaskTag(0, (void*)TASK_STABILIZER_ID_NBR);
 
 #ifdef configUSE_APPLICATION_TASK_TAG
   #if configUSE_APPLICATION_TASK_TAG == 1
@@ -166,19 +199,25 @@ static void stabilizerTask(void* param)
   #endif
 #endif
 
+  //Wait for the system to be fully started to start stabilization loop
   systemWaitStart();
 
-  DEBUG_PRINTI("Wait for sensor calibration...\n");
+  DEBUG_PRINT("Wait for sensor calibration...\n");
 
+  // Wait for sensors to be calibrated
   lastWakeTime = xTaskGetTickCount();
   while(!sensorsAreCalibrated()) {
     vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
   }
+  // Initialize tick to something else then 0
   tick = 1;
 
-  DEBUG_PRINTI("Ready to fly.\n");
+  rateSupervisorInit(&rateSupervisorContext, xTaskGetTickCount(), M2T(1000), 997, 1003, 1);
+
+  DEBUG_PRINT("Ready to fly.\n");
 
   while(1) {
+    // The sensor should unlock at 1kHz
     sensorsWaitDataReady();
 
     if (healthShallWeRunTest())
@@ -186,39 +225,61 @@ static void stabilizerTask(void* param)
       sensorsAcquire(&sensorData, tick);
       healthRunTests(&sensorData);
     } else {
+      // allow to update estimator dynamically
       if (getStateEstimator() != estimatorType) {
         stateEstimatorSwitchTo(estimatorType);
         estimatorType = getStateEstimator();
       }
+      // allow to update controller dynamically
       if (getControllerType() != controllerType) {
         controllerInit(controllerType);
         controllerType = getControllerType();
       }
 
+      // stateEstimator(&state, &sensorData, tick);
       stateEstimator(&state, &sensorData, &control, tick);
+      
       compressState();
 
       commanderGetSetpoint(&setpoint, &state);
       compressSetpoint();
 
-      // sitAwUpdateSetpoint(&setpoint, &sensorData, &state);
+      // collisionAvoidanceUpdateSetpoint(&setpoint, &sensorData, &state, tick);
 
       controller(&control, &setpoint, &sensorData, &state, tick);
 
       checkEmergencyStopTimeout();
-      // supervisorUpdate();
+
+      //
+      // The supervisor module keeps track of Crazyflie state such as if
+      // we are ok to fly, or if the Crazyflie is in flight.
+      //
       supervisorUpdate(&sensorData);
 
-
-      if (emergencyStop) {
+      checkStops = systemIsArmed();
+      if (emergencyStop || (systemIsArmed() == false)) {
         powerStop();
       } else {
         powerDistribution(&control);
       }
+
+      // // Log data to uSD card if configured
+      // if (   usddeckLoggingEnabled()
+      //     && usddeckLoggingMode() == usddeckLoggingMode_SynchronousStabilizer
+      //     && RATE_DO_EXECUTE(usddeckFrequency(), tick)) {
+      //   usddeckTriggerLogging();
+      // }
     }
     calcSensorToOutputLatency(&sensorData);
     tick++;
     STATS_CNT_RATE_EVENT(&stabilizerRate);
+
+    if (!rateSupervisorValidate(&rateSupervisorContext, xTaskGetTickCount())) {
+      if (!rateWarningDisplayed) {
+        DEBUG_PRINT("WARNING: stabilizer loop rate is off (%lu)\n", rateSupervisorLatestCount(&rateSupervisorContext));
+        rateWarningDisplayed = true;
+      }
+    }
   }
 }
 
@@ -263,13 +324,15 @@ LOG_ADD(LOG_FLOAT, yaw, &setpoint.attitudeRate.yaw)
 LOG_GROUP_STOP(ctrltarget)
 
 LOG_GROUP_START(ctrltargetZ)
-LOG_ADD(LOG_INT16, x, &setpointCompressed.x)
+LOG_ADD(LOG_INT16, x, &setpointCompressed.x)   // position - mm
 LOG_ADD(LOG_INT16, y, &setpointCompressed.y)
 LOG_ADD(LOG_INT16, z, &setpointCompressed.z)
-LOG_ADD(LOG_INT16, vx, &setpointCompressed.vx)
+
+LOG_ADD(LOG_INT16, vx, &setpointCompressed.vx) // velocity - mm / sec
 LOG_ADD(LOG_INT16, vy, &setpointCompressed.vy)
 LOG_ADD(LOG_INT16, vz, &setpointCompressed.vz)
-LOG_ADD(LOG_INT16, ax, &setpointCompressed.ax)
+
+LOG_ADD(LOG_INT16, ax, &setpointCompressed.ax) // acceleration - mm / sec^2
 LOG_ADD(LOG_INT16, ay, &setpointCompressed.ay)
 LOG_ADD(LOG_INT16, az, &setpointCompressed.az)
 LOG_GROUP_STOP(ctrltargetZ)
@@ -279,6 +342,7 @@ LOG_ADD(LOG_FLOAT, roll, &state.attitude.roll)
 LOG_ADD(LOG_FLOAT, pitch, &state.attitude.pitch)
 LOG_ADD(LOG_FLOAT, yaw, &state.attitude.yaw)
 LOG_ADD(LOG_FLOAT, thrust, &control.thrust)
+
 STATS_CNT_RATE_LOG_ADD(rtStab, &stabilizerRate)
 LOG_ADD(LOG_UINT32, intToOut, &inToOutLatency)
 LOG_GROUP_STOP(stabilizer)
@@ -331,15 +395,19 @@ LOG_GROUP_START(stateEstimate)
 LOG_ADD(LOG_FLOAT, x, &state.position.x)
 LOG_ADD(LOG_FLOAT, y, &state.position.y)
 LOG_ADD(LOG_FLOAT, z, &state.position.z)
+
 LOG_ADD(LOG_FLOAT, vx, &state.velocity.x)
 LOG_ADD(LOG_FLOAT, vy, &state.velocity.y)
 LOG_ADD(LOG_FLOAT, vz, &state.velocity.z)
+
 LOG_ADD(LOG_FLOAT, ax, &state.acc.x)
 LOG_ADD(LOG_FLOAT, ay, &state.acc.y)
 LOG_ADD(LOG_FLOAT, az, &state.acc.z)
+
 LOG_ADD(LOG_FLOAT, roll, &state.attitude.roll)
 LOG_ADD(LOG_FLOAT, pitch, &state.attitude.pitch)
 LOG_ADD(LOG_FLOAT, yaw, &state.attitude.yaw)
+
 LOG_ADD(LOG_FLOAT, qx, &state.attitudeQuaternion.x)
 LOG_ADD(LOG_FLOAT, qy, &state.attitudeQuaternion.y)
 LOG_ADD(LOG_FLOAT, qz, &state.attitudeQuaternion.z)
@@ -347,17 +415,21 @@ LOG_ADD(LOG_FLOAT, qw, &state.attitudeQuaternion.w)
 LOG_GROUP_STOP(stateEstimate)
 
 LOG_GROUP_START(stateEstimateZ)
-LOG_ADD(LOG_INT16, x, &stateCompressed.x)
+LOG_ADD(LOG_INT16, x, &stateCompressed.x)                 // position - mm
 LOG_ADD(LOG_INT16, y, &stateCompressed.y)
 LOG_ADD(LOG_INT16, z, &stateCompressed.z)
-LOG_ADD(LOG_INT16, vx, &stateCompressed.vx)
+
+LOG_ADD(LOG_INT16, vx, &stateCompressed.vx)               // velocity - mm / sec
 LOG_ADD(LOG_INT16, vy, &stateCompressed.vy)
 LOG_ADD(LOG_INT16, vz, &stateCompressed.vz)
-LOG_ADD(LOG_INT16, ax, &stateCompressed.ax)
+
+LOG_ADD(LOG_INT16, ax, &stateCompressed.ax)               // acceleration - mm / sec^2
 LOG_ADD(LOG_INT16, ay, &stateCompressed.ay)
 LOG_ADD(LOG_INT16, az, &stateCompressed.az)
-LOG_ADD(LOG_UINT32, quat, &stateCompressed.quat)
-LOG_ADD(LOG_INT16, rateRoll, &stateCompressed.rateRoll)
+
+LOG_ADD(LOG_UINT32, quat, &stateCompressed.quat)           // compressed quaternion, see quatcompress.h
+
+LOG_ADD(LOG_INT16, rateRoll, &stateCompressed.rateRoll)   // angular velocity - milliradians / sec
 LOG_ADD(LOG_INT16, ratePitch, &stateCompressed.ratePitch)
 LOG_ADD(LOG_INT16, rateYaw, &stateCompressed.rateYaw)
 LOG_GROUP_STOP(stateEstimateZ)
